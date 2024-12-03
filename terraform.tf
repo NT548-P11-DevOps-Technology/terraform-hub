@@ -1,4 +1,11 @@
 terraform {
+  cloud { 
+    organization = "DevOpsUIT" 
+    workspaces { 
+      name = "DoAn" 
+    } 
+  }
+  
   required_providers {
     aws = {
       source  = "hashicorp/aws"

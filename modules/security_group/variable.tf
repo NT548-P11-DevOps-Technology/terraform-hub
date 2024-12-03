@@ -13,49 +13,27 @@ variable "description" {
   type        = string
 }
 
-variable "ingress_rules_with_cidr" {
+variable "ingress_rules" {
   description = "List of ingress rules"
   type = list(object({
-    description = optional(string)
+    description = string
     from_port   = number
     to_port     = number
-    protocol    = optional(string, "tcp")
+    protocol    = string
     ip          = optional(string)
-  }))
-  default = []
-}
-
-variable "ingress_rules_with_security_group" {
-  description = "List of ingress rules"
-  type = list(object({
-    description       = optional(string)
-    from_port         = optional(number)
-    to_port           = optional(number)
-    protocol          = optional(string, "tcp")
     security_group_id = optional(string)
   }))
   default = []
 }
 
-variable "egress_rules_with_cidr" {
+variable "egress_rules" {
   description = "List of egress rules"
   type = list(object({
-    description = optional(string)
-    from_port   = optional(number)
-    to_port     = optional(number)
-    protocol    = optional(string, "-1")
+    description = string
+    from_port   = number
+    to_port     = number
+    protocol    = string
     ip          = optional(string)
-  }))
-  default = []
-}
-
-variable "egress_rules_with_security_group" {
-  description = "List of egress rules"
-  type = list(object({
-    description       = optional(string)
-    from_port         = optional(number)
-    to_port           = optional(number)
-    protocol          = optional(string, "-1")
     security_group_id = optional(string)
   }))
   default = []

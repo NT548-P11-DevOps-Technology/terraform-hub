@@ -1,210 +1,188 @@
-# List all avalability zones in the region
-data "aws_availability_zones" "available" {}
-locals {
-  selected_azs = slice(data.aws_availability_zones.available.names, 0, var.aws_vpc_config.number_of_availability_zones)
-}
-
-# Get Ubuntu 20.04 AMI
-data "aws_ami" "ubuntu" {
-  most_recent = true
-  owners      = ["099720109477"]
-  filter {
-    name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-*"]
-  }
-
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
-
-  filter {
-    name   = "architecture"
-    values = ["x86_64"]
-  }
-}
-
-locals {
-  ec2_ami = var.ami != "" ? var.ami : data.aws_ami.ubuntu.id
-}
-
-# ENIs
-resource "aws_network_interface" "bastion_eni" {
-  count             = var.bastion_instance_count
-  subnet_id         = module.vpc.public_subnets[0]
-  private_ips       = [var.bastion_eni_ip]
-  security_groups   = [module.bastion_sg.id]
-  source_dest_check = false
-
-  tags = {
-    Name = "${var.aws_project}-bastion_eni"
-  }
-}
-
-resource "aws_network_interface" "monitoring_fe_eni" {
-  count             = var.monitoring_frontend_instance_count
-  subnet_id         = module.vpc.private_subnets[1]
-  private_ips       = [var.monitoring_frontend_eni_ip]
-  security_groups   = [module.monitoring_sg.id]
-
-  tags = {
-    Name = "${var.aws_project}-monitoring_fe_eni"
-  }
-}
-
-resource "aws_network_interface" "monitoring_be_eni" {
-  count             = var.monitoring_backend_instance_count
-  subnet_id         = module.vpc.private_subnets[1]
-  private_ips       = [var.monitoring_backend_eni_ip]
-  security_groups   = [module.monitoring_sg.id]
-
-  tags = {
-    Name = "${var.aws_project}-monitoring_be_eni"
-  }
-}
-
-resource "aws_network_interface" "cluster_eni" {
-  count             = length(var.cluster_eni_ips)
-  subnet_id         = module.vpc.private_subnets[0]
-  private_ips       = [var.cluster_eni_ips[count.index]]
-  security_groups   = [module.cluster_sg.id]
-
-  tags = {
-    Name = "${var.aws_project}-cluster_eni"
-  }
-}
+# module "keypair" {
+#   source = "./modules/keypair"
+#   name   = var.aws_profile
+# }
 
 # Create VPC with public and private subnets
 module "vpc" {
   source = "./modules/vpc"
 
-  name                 = var.aws_project
-  vpc_cidr             = var.aws_vpc_config.cidr_block
+  name = var.aws_project
+
+  cidr                 = var.aws_vpc_config.cidr_block
   enable_dns_hostnames = var.aws_vpc_config.enable_dns_hostnames
   enable_dns_support   = var.aws_vpc_config.enable_dns_support
-  public_subnets_cidr  = var.aws_vpc_config.public_subnets_cidr
-  private_subnets_cidr = var.aws_vpc_config.private_subnets_cidr
-  availability_zones   = local.selected_azs
-  enable_nat_gateway   = var.aws_vpc_config.enable_nat_gateway
-  eni_id               = aws_network_interface.bastion_eni[0].id
+  public_subnets       = var.aws_vpc_config.public_subnets_cidr
+  private_subnets      = var.aws_vpc_config.private_subnets_cidr
+  azs                  = local.selected_azs
+  gateway_instance     = module.instances.network_interfaces["gateway"]
 }
 
-# Create VPN Server
-resource "aws_instance" "bastion_instance" {
-  count         = var.bastion_instance_count
-  ami           = local.ec2_ami
-  instance_type = "t2.small"
+# Create security group for gateway instance
+module "gateway_sg" {
+  source      = "./modules/security_group"
+  name        = "${var.aws_project}-gateway-sg"
+  description = "Security group for gateway instance"
+  vpc_id      = module.vpc.vpc_id
 
-  key_name               = var.aws_key_name
-  user_data              = file("./scripts/bastion-init.sh")
+  ingress_rules = [
+    {
+      description = "Allow OpenVPN Access"
+      from_port   = 1194
+      to_port     = 1194
+      protocol    = "udp"
+      ip          = "0.0.0.0/0"
+    },
+    {
+      description = "Allow SSH Access"
+      from_port   = 22
+      to_port     = 22
+      protocol    = "tcp"
+      ip          = "0.0.0.0/0"
+    },
+    {
+      description = "Allow All Traffic from VPC"
+      from_port   = -1
+      to_port     = -1
+      protocol    = "icmp"
+      ip          = "0.0.0.0/0"
+    },
+    {
+      description      = "Allow all traffic from servers"
+      from_port        = -1
+      to_port          = -1
+      protocol         = "-1"
+      security_group_id = module.servers_sg.id
+    }
+  ]
 
-  network_interface {
-    network_interface_id = aws_network_interface.bastion_eni[count.index].id
-    device_index         = 0
-  }
-
-  root_block_device {
-    volume_size = var.bastion_instance_ebs_size
-  }
-
-  tags = {
-    Name = "${var.aws_project}-bastion-instance-${count.index}"
-  }
+  egress_rules = [
+    {
+      description = "Allow all outbound traffic"
+      from_port   = -1
+      to_port     = -1
+      protocol    = "-1"
+      ip          = "0.0.0.0/0"
+    }
+  ]
 }
 
-# Create Monitoring Frontend Servers
-resource "aws_instance" "monitoring_fe_instance" {
-  count                  = var.monitoring_frontend_instance_count
-  ami                    = local.ec2_ami
-  instance_type          = "t2.medium"
+# Create security group for load balancer
+module "load_balancer_sg" {
+  source      = "./modules/security_group"
+  name        = "${var.aws_project}-load-balancer-sg"
+  description = "Security group for load balancer"
+  vpc_id      = module.vpc.vpc_id
 
-  key_name               = var.aws_key_name
-  user_data             = file("./scripts/init.sh")
-
-  network_interface {
-    network_interface_id = aws_network_interface.monitoring_fe_eni[count.index].id
-    device_index         = 0
-  }
-
-  root_block_device {
-    volume_size = var.monitoring_frontend_instance_ebs_size
-  }
-
-  tags = {
-    Name = "${var.aws_project}-monitoring-fe-instance-${count.index}"
-  }
+  ingress_rules = [
+    {
+      description = "Allow HTTP Access"
+      from_port   = 80
+      to_port     = 80
+      protocol    = "tcp"
+      ip          = "0.0.0.0/0"
+    },
+    {
+      description = "Allow HTTPS Access"
+      from_port   = 443
+      to_port     = 443
+      protocol    = "tcp"
+      ip          = "0.0.0.0/0"
+    }
+  ]
 }
 
-# Create Monitoring Backend Servers
-resource "aws_instance" "monitoring_be_instance" {
-  count                  = var.monitoring_backend_instance_count
-  ami                    = local.ec2_ami
-  instance_type          = "t2.medium"
+module "servers_sg" {
+  source      = "./modules/security_group"
+  name        = "${var.aws_project}-servers-sg"
+  description = "Security group for servers"
+  vpc_id      = module.vpc.vpc_id
 
-  key_name               = var.aws_key_name
-  user_data              = file("./scripts/init.sh")
-
-  network_interface {
-    network_interface_id = aws_network_interface.monitoring_be_eni[count.index].id
-    device_index         = 0
-  }
-
-  root_block_device {
-    volume_size = var.monitoring_backend_instance_ebs_size
-  }
-
-  tags = {
-    Name = "${var.aws_project}-monitoring-be-instance-${count.index}"
-  }
+  ingress_rules = [
+    {
+      description      = "Allow ssh from gateway"
+      from_port        = 22
+      to_port          = 22
+      protocol         = "tcp"
+      security_group_id = module.gateway_sg.id
+    },
+    {
+      description      = "Allow all ticmp from gateway"
+      from_port        = -1
+      to_port          = -1
+      protocol         = "icmp"
+      security_group_id = module.gateway_sg.id
+    },
+    {
+      description = "Allow traffic http from load balancer"
+      from_port   = 80
+      to_port     = 80
+      protocol    = "tcp"
+      security_group_id = module.load_balancer_sg.id
+    },
+    {
+      description = "Allow https traffic from load balancer"
+      from_port   = 443
+      to_port     = 443
+      protocol    = "tcp"
+      security_group_id = module.load_balancer_sg.id
+    }
+  ]
+  egress_rules = [
+    {
+      description = "Allow all outbound traffic"
+      from_port   = -1
+      to_port     = -1
+      protocol    = "-1"
+      security_group_id = module.gateway_sg.id
+    }
+  ]
 }
 
-# Create K3s Cluster
-resource "aws_instance" "k3s_instance" {
-  count                  = var.cluster_instance_count
-  ami                    = local.ec2_ami
-  instance_type          = "t2.large"
+module "instances" {
+  source = "./modules/instance"
 
-  key_name               = var.aws_key_name
-  user_data             = file("./scripts/init.sh")
-
-  network_interface {
-    network_interface_id = aws_network_interface.cluster_eni[count.index].id
-    device_index         = 0
-  }
-
-  root_block_device {
-    volume_size = var.cluster_instance_ebs_size
-  }
-
-  tags = {
-    Name = "${var.aws_project}-cluster-instance-${count.index}"
-  }
+  subnet_id = module.vpc.private_subnets_id[0]
+  security_groups = [module.servers_sg.id]
+  key_name = var.aws_keyname
+  ami = local.ec2_ami
+  instance_type = "t2.micro"
+  ebs_size = 10
+  instances = [
+    {
+      name = "gateway"
+      subnet_id = module.vpc.public_subnets_id[0]
+      private_ips = local.gateway_private_ips
+      source_dest_check = false
+      instance_type = "t2.small"
+      security_groups = [module.gateway_sg.id]
+      user_data = file("./scripts/bastion-init.sh")
+    },
+    {
+      name = "server1"
+      private_ips = local.server1_private_ips
+    },
+    {
+      name = "server2"
+      private_ips = local.server2_private_ips
+    }
+  ]
 }
 
-resource "null_resource" "set_up_openvpn_server" {
-  depends_on = [ aws_instance.bastion_instance ]
+module "load_balancer" {
+  source = "./modules/autoscaling_group"
 
-  triggers = {
-    "always_run" = timestamp()
-  }
-
-  connection {
-    type        = "ssh"
-    user        = "ubuntu"
-    host        = aws_instance.bastion_instance[0].public_ip
-    private_key = file("${path.root}/${var.aws_key_name}.pem")
-    agent = false
-  }
-
-  provisioner "file" {
-    source      = "./scripts/openvpn-install.sh"
-    destination = "/home/ubuntu/openvpn-install.sh"
-  }
-
-  provisioner "remote-exec" {
-    inline = [ 
-      "chmod +x /home/ubuntu/openvpn-install.sh",
-      "sudo /home/ubuntu/openvpn-install.sh"
-     ]
-  }
+  name = "${var.aws_project}-load-balancer"
+  aws_key_name = var.aws_keyname
+  ami = local.ec2_ami
+  instance_type = "t2.micro"
+  user_data = file("./scripts/init.sh")
+  ec2_subnets = module.vpc.private_subnets_id
+  ec2_security_groups = [module.servers_sg.id]
+  availability_zones = local.selected_azs
+  min_size = 1
+  max_size = 1
+  desired_capacity = 1
+  lb_security_groups = [module.load_balancer_sg.id]
+  lb_subnets = module.vpc.public_subnets_id
 }

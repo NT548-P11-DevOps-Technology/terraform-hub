@@ -1,36 +1,38 @@
 # VPC Module
 resource "aws_vpc" "main" {
-  cidr_block           = var.vpc_cidr
-  enable_dns_hostnames = var.enable_dns_hostnames
-  enable_dns_support   = var.enable_dns_support
+  cidr_block          = var.cidr
+  enable_dns_hostnames                 = var.enable_dns_hostnames
+  enable_dns_support                   = var.enable_dns_support
 
   tags = {
-    Name = "${var.name}-VPC"
+    "Name" = var.name 
   }
 }
 
 # Public Subnets
 resource "aws_subnet" "public" {
-  count                   = length(var.public_subnets_cidr)
+  count                   = length(var.public_subnets)
+
   vpc_id                  = aws_vpc.main.id
-  cidr_block              = element(var.public_subnets_cidr, count.index)
-  availability_zone       = element(var.availability_zones, count.index % length(var.availability_zones))
-  map_public_ip_on_launch = true
+  cidr_block              = element(var.public_subnets, count.index)
+  availability_zone       = element(var.azs, count.index % length(var.azs))
+  map_public_ip_on_launch = var.map_public_ip_on_launch
 
   tags = {
-    Name = "${var.name}-public-subnet-${count.index + 1}"
+    Name = "${var.name}-public-${count.index + 1}"
   }
 }
 
 # Private Subnets
 resource "aws_subnet" "private" {
-  count             = length(var.private_subnets_cidr)
+  count             = length(var.private_subnets)
+
   vpc_id            = aws_vpc.main.id
-  cidr_block        = element(var.private_subnets_cidr, count.index)
-  availability_zone = element(var.availability_zones, count.index % length(var.availability_zones))
+  cidr_block        = element(var.private_subnets, count.index)
+  availability_zone = element(var.azs, count.index % length(var.azs))
 
   tags = {
-    Name = "${var.name}-private-subnet-${count.index}"
+    Name = "${var.name}-private-${count.index}"
   }
 }
 
@@ -39,18 +41,46 @@ resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name = "${var.name}-IGW"
+    Name = var.name
   }
 }
 
-# Route Tables
-module "route_tables" {
-  source              = "../route_tables"
-  vpc_id              = aws_vpc.main.id
-  name                = var.name
-  internet_gateway_id = aws_internet_gateway.main.id
-  enable_nat_gateway  = var.enable_nat_gateway
-  public_subnet_ids   = aws_subnet.public[*].id
-  private_subnet_ids  = aws_subnet.private[*].id
-  eni_id              = var.eni_id
+# Public Route Tables
+resource "aws_route_table" "public" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.main.id
+  }
+
+  tags = {
+    Name = "${var.name}-public"
+  }
+}
+
+resource "aws_route_table_association" "public" {
+  count          = length(aws_subnet.public)
+  subnet_id      = aws_subnet.public[count.index].id
+  route_table_id = aws_route_table.public.id
+}
+
+# Private Route Tables
+resource "aws_route_table" "private" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block     = "0.0.0.0/0"
+    network_interface_id = var.gateway_instance
+  }
+
+  tags = {
+    Name = "${var.name}-private"
+  }
+}
+
+resource "aws_route_table_association" "private" {
+  count          = length(aws_subnet.private)
+  subnet_id      = aws_subnet.private[count.index].id
+  route_table_id = aws_route_table.private.id
 }

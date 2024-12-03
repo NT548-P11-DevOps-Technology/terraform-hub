@@ -6,5 +6,5 @@ variable "name" {
 variable "algorithm" {
   description = "Algorithm for the key pair"
   type        = string
-  default     = "RSA"
+  default     = "ECDSA"
 }
