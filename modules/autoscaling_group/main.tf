@@ -118,7 +118,8 @@ resource "aws_autoscaling_policy" "main" {
   policy_type = "TargetTrackingScaling"
   target_tracking_configuration {
     predefined_metric_specification {
-      predefined_metric_type = "ASGAverageNetworkIn"
+      predefined_metric_type = "ASGAverageCPUUtilization"
+      # predefined_metric_type = "ASGAverageNetworkIn"
     }
 
     target_value = 50.0

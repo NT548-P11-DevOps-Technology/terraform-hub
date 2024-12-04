@@ -52,7 +52,7 @@ module "gateway_sg" {
       from_port        = -1
       to_port          = -1
       protocol         = "-1"
-      security_group_id = module.servers_sg.id
+      ip               = var.aws_vpc_config.cidr_block
     }
   ]
 
@@ -101,6 +101,53 @@ module "load_balancer_sg" {
   ]
 }
 
+module "haproxy_sg" {
+  source      = "./modules/security_group"
+  name        = "${var.aws_project}-haproxy-sg"
+  description = "Security group for haproxy"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress_rules = [
+    {
+      description = "Allow traffic http from load balancer"
+      from_port   = 80
+      to_port     = 80
+      protocol    = "tcp"
+      security_group_id = module.load_balancer_sg.id
+    },
+    {
+      description = "Allow https traffic from load balancer"
+      from_port   = 443
+      to_port     = 443
+      protocol    = "tcp"
+      security_group_id = module.load_balancer_sg.id
+    },
+    {
+      description      = "Allow ssh from gateway"
+      from_port        = 22
+      to_port          = 22
+      protocol         = "tcp"
+      security_group_id = module.gateway_sg.id
+    },
+    {
+      description      = "Allow all ticmp from gateway"
+      from_port        = -1
+      to_port          = -1
+      protocol         = "icmp"
+      security_group_id = module.gateway_sg.id
+    }
+  ]
+  egress_rules = [
+    {
+      description = "Allow all outbound traffic"
+      from_port   = -1
+      to_port     = -1
+      protocol    = "-1"
+      ip          = "0.0.0.0/0"
+    }
+  ] 
+}
+
 module "servers_sg" {
   source      = "./modules/security_group"
   name        = "${var.aws_project}-servers-sg"
@@ -123,18 +170,11 @@ module "servers_sg" {
       security_group_id = module.gateway_sg.id
     },
     {
-      description = "Allow traffic http from load balancer"
-      from_port   = 80
-      to_port     = 80
-      protocol    = "tcp"
-      security_group_id = module.load_balancer_sg.id
-    },
-    {
-      description = "Allow https traffic from load balancer"
-      from_port   = 443
-      to_port     = 443
-      protocol    = "tcp"
-      security_group_id = module.load_balancer_sg.id
+      description      = "Allow traffic from haproxy"
+      from_port        = -1
+      to_port          = -1
+      protocol         = "icmp"
+      security_group_id = module.haproxy_sg.id
     }
   ]
   egress_rules = [
@@ -143,22 +183,9 @@ module "servers_sg" {
       from_port   = -1
       to_port     = -1
       protocol    = "-1"
-      security_group_id = module.gateway_sg.id
+      ip          = "0.0.0.0/0"
     }
   ]
-}
-
-resource "aws_instance" "public" {
-  ami           = local.ec2_ami
-  instance_type = "t2.micro"
-  key_name      = var.aws_keyname
-  subnet_id     = module.vpc.public_subnets_id[0]
-  security_groups = [module.load_balancer_sg.id]
-  iam_instance_profile = "LabInstanceProfile"
-
-  tags = {
-    Name = "${var.aws_project}-public"
-  }
 }
 
 module "instances" {
@@ -191,27 +218,41 @@ module "instances" {
   ]
 }
 
-# module "load_balancer" {
-#   source = "./modules/autoscaling_group"
+module "load_balancer" {
+  source = "./modules/autoscaling_group"
 
-#   name = "${var.aws_project}-loadbalancer"
-#   aws_key_name = var.aws_keyname
-#   ami = local.ec2_ami
-#   instance_type = "t2.micro"
-#   user_data = base64encode(file("./scripts/nginx_setup.sh"))
-#   ec2_subnets = module.vpc.private_subnets_id
-#   ec2_security_groups = [module.servers_sg.id]
-#   min_size = 1
-#   max_size = 3
-#   desired_capacity = 1
-#   lb_security_groups = [module.load_balancer_sg.id]
-#   lb_subnets = module.vpc.public_subnets_id
-#   vpc_id = module.vpc.vpc_id
-#   health_check = {
-#     path = "/"
-#     port = 80
-#     protocol = "HTTP"
-#   }
-# }
+  name = "${var.aws_project}-loadbalancer"
+  aws_key_name = var.aws_keyname
+  ami = local.ec2_ami
+  instance_type = "t2.micro"
+  user_data = base64encode(file("./scripts/nginx_setup.sh"))
+  ec2_subnets = module.vpc.private_subnets_id
+  ec2_security_groups = [module.haproxy_sg.id]
+  min_size = 1
+  max_size = 3
+  desired_capacity = 1
+  lb_security_groups = [module.load_balancer_sg.id]
+  lb_subnets = module.vpc.public_subnets_id
+  vpc_id = module.vpc.vpc_id
+  health_check = {
+    path = "/"
+    port = 80
+    protocol = "HTTP"
+  }
+}
 
+module "EKS" {
+  source = "./modules/eks"
 
+  name = var.aws_project
+  role_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/LabRole"
+  k8s_version = "1.29"
+  cluster_vpc_cidr = var.aws_vpc_config.cidr_block
+  cluster_subnet_ids = module.vpc.private_subnets_id
+  service_ipv4_cidr = "10.100.0.0/16"
+  eks_addons = ["vpc-cni", "kube-proxy", "coredns"]
+  node_group_subnet_ids = module.vpc.private_subnets_id
+  node_group_desired_size = 1
+  node_group_max_size = 3
+  node_group_min_size = 1
+}
