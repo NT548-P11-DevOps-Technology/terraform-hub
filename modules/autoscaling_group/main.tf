@@ -1,10 +1,13 @@
 resource "aws_launch_template" "main" {
+  name = var.name
   image_id = var.ami
   instance_type = var.instance_type
   key_name = var.aws_key_name
   user_data = var.user_data
-  security_group_names = var.ec2_security_groups
 
+  network_interfaces {
+    security_groups = var.ec2_security_groups
+  }
   tag_specifications {
     resource_type = "instance"
     tags = {
@@ -14,7 +17,7 @@ resource "aws_launch_template" "main" {
 }
 
 resource "aws_autoscaling_group" "main" {
-  availability_zones = var.availability_zones
+  name          = var.name
   min_size       = var.min_size
   max_size       = var.max_size
   desired_capacity   = var.desired_capacity
@@ -32,10 +35,6 @@ resource "aws_autoscaling_group" "main" {
   }
 
   health_check_type = "ELB"
-  target_group_arns = [
-    aws_lb_target_group.http.arn,
-    aws_lb_target_group.https.arn
-  ]
   tag {
     key     = "Name"
     value      = var.name
@@ -73,13 +72,14 @@ resource "aws_lb_listener" "https" {
 }
 
 resource "aws_lb_target_group" "http" {
-  name   = var.name
+  name   = "${var.name}-http"
   port   = 80
   protocol = "TCP"
+  vpc_id = var.vpc_id
   health_check {
-    path = "/health"
-    protocol = "HTTP"
-    port = "traffic-port"
+    path = var.health_check.path
+    protocol = var.health_check.protocol
+    port = var.health_check.port
     interval = 30
     timeout = 5
     healthy_threshold = 2
@@ -88,16 +88,40 @@ resource "aws_lb_target_group" "http" {
 }
 
 resource "aws_lb_target_group" "https" {
-  name   = var.name
+  name   = "${var.name}-https"
   port   = 443
   protocol = "TCP"
+  vpc_id = var.vpc_id
   health_check {
-    path = "/health"
-    protocol = "HTTP"
-    port = 8404
+    path = var.health_check.path
+    protocol = var.health_check.protocol
+    port = var.health_check.port
     interval = 30
     timeout = 5
     healthy_threshold = 2
     unhealthy_threshold = 2
   }
+}
+
+resource "aws_autoscaling_attachment" "http" {
+  autoscaling_group_name = aws_autoscaling_group.main.id
+  lb_target_group_arn   = aws_lb_target_group.http.arn
+}
+
+resource "aws_autoscaling_attachment" "https" {
+  autoscaling_group_name = aws_autoscaling_group.main.id
+  lb_target_group_arn   = aws_lb_target_group.https.arn
+}
+
+resource "aws_autoscaling_policy" "main" {
+  name                   = "network-traffic"
+  policy_type = "TargetTrackingScaling"
+  target_tracking_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "ASGAverageNetworkIn"
+    }
+
+    target_value = 50.0
+  }
+  autoscaling_group_name = aws_autoscaling_group.main.name
 }

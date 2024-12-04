@@ -90,6 +90,15 @@ module "load_balancer_sg" {
       ip          = "0.0.0.0/0"
     }
   ]
+  egress_rules = [
+    {
+      description = "Allow all outbound traffic"
+      from_port   = -1
+      to_port     = -1
+      protocol    = "-1"
+      ip          = "0.0.0.0/0"
+    }
+  ]
 }
 
 module "servers_sg" {
@@ -139,6 +148,19 @@ module "servers_sg" {
   ]
 }
 
+resource "aws_instance" "public" {
+  ami           = local.ec2_ami
+  instance_type = "t2.micro"
+  key_name      = var.aws_keyname
+  subnet_id     = module.vpc.public_subnets_id[0]
+  security_groups = [module.load_balancer_sg.id]
+  iam_instance_profile = "LabInstanceProfile"
+
+  tags = {
+    Name = "${var.aws_project}-public"
+  }
+}
+
 module "instances" {
   source = "./modules/instance"
 
@@ -169,20 +191,27 @@ module "instances" {
   ]
 }
 
-module "load_balancer" {
-  source = "./modules/autoscaling_group"
+# module "load_balancer" {
+#   source = "./modules/autoscaling_group"
 
-  name = "${var.aws_project}-load-balancer"
-  aws_key_name = var.aws_keyname
-  ami = local.ec2_ami
-  instance_type = "t2.micro"
-  user_data = file("./scripts/init.sh")
-  ec2_subnets = module.vpc.private_subnets_id
-  ec2_security_groups = [module.servers_sg.id]
-  availability_zones = local.selected_azs
-  min_size = 1
-  max_size = 1
-  desired_capacity = 1
-  lb_security_groups = [module.load_balancer_sg.id]
-  lb_subnets = module.vpc.public_subnets_id
-}
+#   name = "${var.aws_project}-loadbalancer"
+#   aws_key_name = var.aws_keyname
+#   ami = local.ec2_ami
+#   instance_type = "t2.micro"
+#   user_data = base64encode(file("./scripts/nginx_setup.sh"))
+#   ec2_subnets = module.vpc.private_subnets_id
+#   ec2_security_groups = [module.servers_sg.id]
+#   min_size = 1
+#   max_size = 3
+#   desired_capacity = 1
+#   lb_security_groups = [module.load_balancer_sg.id]
+#   lb_subnets = module.vpc.public_subnets_id
+#   vpc_id = module.vpc.vpc_id
+#   health_check = {
+#     path = "/"
+#     port = 80
+#     protocol = "HTTP"
+#   }
+# }
+
+

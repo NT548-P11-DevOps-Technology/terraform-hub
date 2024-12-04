@@ -15,3 +15,5 @@
 inventory.yml
 *.ovpn
 loki.json
+
+eks/

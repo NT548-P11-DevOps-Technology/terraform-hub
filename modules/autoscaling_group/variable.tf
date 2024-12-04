@@ -22,7 +22,6 @@ variable "instance_type" {
 variable "user_data" {
   description = "User data for the EC2 instances"
   type    = string
-  default = null
 }
 
 variable "ec2_subnets" {
@@ -34,11 +33,6 @@ variable "ec2_security_groups" {
   description = "Security group names for the EC2 instances"
   type    = list(string)
   default = []
-}
-
-variable "availability_zones" {
-  description = "Availability zones for the autoscaling group"
-  type    = list(string)
 }
 
 variable "min_size" {
@@ -64,4 +58,18 @@ variable "lb_security_groups" {
 variable "lb_subnets" {
   description = "Subnet IDs for the load balancer"
   type    = list(string)
+}
+
+variable "vpc_id" {
+  description = "VPC ID"
+  type    = string
+}
+
+variable "health_check" {
+  description = "Health check for the autoscaling group"
+  type    = object({
+    path = string
+    port = number
+    protocol = string
+  })
 }

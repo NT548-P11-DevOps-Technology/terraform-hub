@@ -1,3 +1,5 @@
+data "aws_caller_identity" "current" {}
+
 # List all avalability zones in the region
 data "aws_availability_zones" "available" {}
 
