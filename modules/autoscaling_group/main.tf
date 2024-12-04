@@ -122,7 +122,7 @@ resource "aws_autoscaling_policy" "main" {
       # predefined_metric_type = "ASGAverageNetworkIn"
     }
 
-    target_value = 50.0
+    target_value = 80.0
   }
   autoscaling_group_name = aws_autoscaling_group.main.name
 }

@@ -1,8 +1,3 @@
-# module "keypair" {
-#   source = "./modules/keypair"
-#   name   = var.aws_profile
-# }
-
 # Create VPC with public and private subnets
 module "vpc" {
   source = "./modules/vpc"
@@ -18,202 +13,49 @@ module "vpc" {
   gateway_instance     = module.instances.network_interfaces["gateway"]
 }
 
-# Create security group for gateway instance
-module "gateway_sg" {
-  source      = "./modules/security_group"
-  name        = "${var.aws_project}-gateway-sg"
-  description = "Security group for gateway instance"
-  vpc_id      = module.vpc.vpc_id
-
-  ingress_rules = [
-    {
-      description = "Allow OpenVPN Access"
-      from_port   = 1194
-      to_port     = 1194
-      protocol    = "udp"
-      ip          = "0.0.0.0/0"
-    },
-    {
-      description = "Allow SSH Access"
-      from_port   = 22
-      to_port     = 22
-      protocol    = "tcp"
-      ip          = "0.0.0.0/0"
-    },
-    {
-      description = "Allow All Traffic from VPC"
-      from_port   = -1
-      to_port     = -1
-      protocol    = "icmp"
-      ip          = "0.0.0.0/0"
-    },
-    {
-      description      = "Allow all traffic from servers"
-      from_port        = -1
-      to_port          = -1
-      protocol         = "-1"
-      ip               = var.aws_vpc_config.cidr_block
-    }
-  ]
-
-  egress_rules = [
-    {
-      description = "Allow all outbound traffic"
-      from_port   = -1
-      to_port     = -1
-      protocol    = "-1"
-      ip          = "0.0.0.0/0"
-    }
-  ]
-}
-
-# Create security group for load balancer
-module "load_balancer_sg" {
-  source      = "./modules/security_group"
-  name        = "${var.aws_project}-load-balancer-sg"
-  description = "Security group for load balancer"
-  vpc_id      = module.vpc.vpc_id
-
-  ingress_rules = [
-    {
-      description = "Allow HTTP Access"
-      from_port   = 80
-      to_port     = 80
-      protocol    = "tcp"
-      ip          = "0.0.0.0/0"
-    },
-    {
-      description = "Allow HTTPS Access"
-      from_port   = 443
-      to_port     = 443
-      protocol    = "tcp"
-      ip          = "0.0.0.0/0"
-    }
-  ]
-  egress_rules = [
-    {
-      description = "Allow all outbound traffic"
-      from_port   = -1
-      to_port     = -1
-      protocol    = "-1"
-      ip          = "0.0.0.0/0"
-    }
-  ]
-}
-
-module "haproxy_sg" {
-  source      = "./modules/security_group"
-  name        = "${var.aws_project}-haproxy-sg"
-  description = "Security group for haproxy"
-  vpc_id      = module.vpc.vpc_id
-
-  ingress_rules = [
-    {
-      description = "Allow traffic http from load balancer"
-      from_port   = 80
-      to_port     = 80
-      protocol    = "tcp"
-      security_group_id = module.load_balancer_sg.id
-    },
-    {
-      description = "Allow https traffic from load balancer"
-      from_port   = 443
-      to_port     = 443
-      protocol    = "tcp"
-      security_group_id = module.load_balancer_sg.id
-    },
-    {
-      description      = "Allow ssh from gateway"
-      from_port        = 22
-      to_port          = 22
-      protocol         = "tcp"
-      security_group_id = module.gateway_sg.id
-    },
-    {
-      description      = "Allow all ticmp from gateway"
-      from_port        = -1
-      to_port          = -1
-      protocol         = "icmp"
-      security_group_id = module.gateway_sg.id
-    }
-  ]
-  egress_rules = [
-    {
-      description = "Allow all outbound traffic"
-      from_port   = -1
-      to_port     = -1
-      protocol    = "-1"
-      ip          = "0.0.0.0/0"
-    }
-  ] 
-}
-
-module "servers_sg" {
-  source      = "./modules/security_group"
-  name        = "${var.aws_project}-servers-sg"
-  description = "Security group for servers"
-  vpc_id      = module.vpc.vpc_id
-
-  ingress_rules = [
-    {
-      description      = "Allow ssh from gateway"
-      from_port        = 22
-      to_port          = 22
-      protocol         = "tcp"
-      security_group_id = module.gateway_sg.id
-    },
-    {
-      description      = "Allow all ticmp from gateway"
-      from_port        = -1
-      to_port          = -1
-      protocol         = "icmp"
-      security_group_id = module.gateway_sg.id
-    },
-    {
-      description      = "Allow traffic from haproxy"
-      from_port        = -1
-      to_port          = -1
-      protocol         = "icmp"
-      security_group_id = module.haproxy_sg.id
-    }
-  ]
-  egress_rules = [
-    {
-      description = "Allow all outbound traffic"
-      from_port   = -1
-      to_port     = -1
-      protocol    = "-1"
-      ip          = "0.0.0.0/0"
-    }
-  ]
-}
-
 module "instances" {
   source = "./modules/instance"
 
-  subnet_id = module.vpc.private_subnets_id[0]
+  subnet_id = module.vpc.private_subnets_id[2]
   security_groups = [module.servers_sg.id]
   key_name = var.aws_keyname
   ami = local.ec2_ami
   instance_type = "t2.micro"
-  ebs_size = 10
+  ebs_size = 8
   instances = [
     {
       name = "gateway"
-      subnet_id = module.vpc.public_subnets_id[0]
       private_ips = local.gateway_private_ips
+      subnet_id = module.vpc.public_subnets_id[0]
       source_dest_check = false
-      instance_type = "t2.small"
-      security_groups = [module.gateway_sg.id]
       user_data = file("./scripts/bastion-init.sh")
+      instance_type = var.bastion_host_instance_type
+      ebs_size = var.bastion_host_ebs_size
+      security_groups = [module.gateway_sg.id]
     },
     {
-      name = "server1"
-      private_ips = local.server1_private_ips
+      name = "harbor"
+      private_ips = local.harbor_private_ips
+      instance_type = var.harbor_instance_type
+      ebs_size = var.harbor_ebs_size
     },
     {
-      name = "server2"
-      private_ips = local.server2_private_ips
+      name = "minio"
+      private_ips = local.minio_private_ips
+      instance_type = var.minio_instance_type
+      ebs_size = var.minio_ebs_size
+    },
+    {
+      name = "vault"
+      private_ips = local.vault_private_ips
+      instance_type = var.vault_instance_type
+      ebs_size = var.vault_ebs_size
+    },
+    {
+      name = "security-servers"
+      private_ips = local.security_servers_private_ips
+      instance_type = var.security_servers_instance_type
+      ebs_size = var.security_servers_ebs_size
     }
   ]
 }
@@ -221,24 +63,25 @@ module "instances" {
 module "load_balancer" {
   source = "./modules/autoscaling_group"
 
-  name = "${var.aws_project}-loadbalancer"
+  name = "${var.aws_project}-haproxy"
   aws_key_name = var.aws_keyname
   ami = local.ec2_ami
-  instance_type = "t2.micro"
+  instance_type = var.autoscaling_group_instance_type
   user_data = base64encode(file("./scripts/nginx_setup.sh"))
-  ec2_subnets = module.vpc.private_subnets_id
+  ec2_subnets = slice(module.vpc.private_subnets_id, length(module.vpc.private_subnets_id) - 2, length(module.vpc.private_subnets_id))
   ec2_security_groups = [module.haproxy_sg.id]
-  min_size = 1
-  max_size = 3
-  desired_capacity = 1
+  min_size = var.autoscaling_group_min_size
+  max_size = var.autoscaling_group_max_size
+  desired_capacity = var.autoscaling_group_desired_capacity
   lb_security_groups = [module.load_balancer_sg.id]
   lb_subnets = module.vpc.public_subnets_id
   vpc_id = module.vpc.vpc_id
   health_check = {
-    path = "/"
-    port = 80
-    protocol = "HTTP"
+    path = var.autoscaling_group_health_check_path
+    port = var.autoscaling_group_health_check_port
+    protocol = var.autoscaling_group_health_check_protocol
   }
+  depends_on = [ module.EKS.cluster_security_group_id ]
 }
 
 module "EKS" {
@@ -249,10 +92,10 @@ module "EKS" {
   k8s_version = "1.29"
   cluster_vpc_cidr = var.aws_vpc_config.cidr_block
   cluster_subnet_ids = module.vpc.private_subnets_id
-  service_ipv4_cidr = "10.100.0.0/16"
+  service_ipv4_cidr = var.service_ipv4_cidr
   eks_addons = ["vpc-cni", "kube-proxy", "coredns"]
   node_group_subnet_ids = module.vpc.private_subnets_id
-  node_group_desired_size = 1
-  node_group_max_size = 3
-  node_group_min_size = 1
+  node_group_min_size = var.node_group_min_size
+  node_group_max_size = var.node_group_max_size
+  node_group_desired_size = var.node_group_desired_size
 }

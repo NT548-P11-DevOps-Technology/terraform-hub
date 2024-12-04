@@ -28,7 +28,7 @@ variable "public_subnets" {
 variable "map_public_ip_on_launch" {
   description = "A boolean flag to enable/disable auto-assign public IP on launch"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "private_subnets" {

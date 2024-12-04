@@ -2,8 +2,8 @@ aws_region      = "us-east-1"
 aws_profile     = "aws-learner-lab"
 aws_environment = "prod"
 aws_project     = "NT548.P11"
-aws_owner       = "Group01"
-aws_keypair    = "learner-lab"
+aws_owner       = "Group03"
+aws_keypair    = "devops-group03"
 
 aws_vpc_config = {
   cidr_block                   = "10.0.0.0/16"

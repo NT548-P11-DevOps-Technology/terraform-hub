@@ -17,7 +17,6 @@ resource "aws_eks_cluster" "main" {
   kubernetes_network_config {
     service_ipv4_cidr = var.service_ipv4_cidr
   }
-
 }
 
 resource "aws_eks_addon" "main" {
@@ -49,7 +48,6 @@ resource "aws_eks_node_group" "main" {
     ignore_changes = [scaling_config[0].desired_size] // Ignore desired size 
   }
 }
-
 
 resource "aws_vpc_security_group_ingress_rule" "main" {
   security_group_id            = aws_eks_cluster.main.vpc_config[0].cluster_security_group_id
