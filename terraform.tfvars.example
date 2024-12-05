@@ -2,15 +2,42 @@ aws_region      = "us-east-1"
 aws_profile     = "aws-learner-lab"
 aws_environment = "prod"
 aws_project     = "NT548.P11"
-aws_owner       = "Group03"
-aws_keypair    = "devops-group03"
+aws_owner       = "Group01"
+aws_keyname    = "devops-group03"
 
 aws_vpc_config = {
   cidr_block                   = "10.0.0.0/16"
   enable_dns_support           = true
   enable_dns_hostnames         = true
-  public_subnets_cidr          = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
-  private_subnets_cidr         = ["10.0.10.0/24", "10.0.20.0/24", "10.0.30.0/24"]
+  public_subnets_cidr          = ["10.0.100.0/24"]
+  private_subnets_cidr         = ["10.0.10.0/24", "10.0.20.0/24", "10.0.30.0/24", "10.0.1.0/24", "10.0.2.0/24"]
   number_of_availability_zones = 3
   enable_nat_gateway           = false
 }
+
+# instances
+bastion_host_instance_type = "t2.small"
+bastion_host_ebs_size = 15
+harbor_instance_type = "t2.medium"
+harbor_ebs_size = 20
+minio_instance_type = "t2.medium"
+minio_ebs_size = 20
+vault_instance_type = "t2.medium"
+vault_ebs_size = 20
+security_servers_instance_type = "t2.medium"
+security_servers_ebs_size = 20
+
+# autoscaling group
+autoscaling_group_instance_type = "t2.medium"
+autoscaling_group_min_size = 1
+autoscaling_group_max_size = 2
+autoscaling_group_desired_capacity = 1
+autoscaling_group_health_check_path = "/"
+autoscaling_group_health_check_port = 80
+autoscaling_group_health_check_protocol = "HTTP"
+
+# EKS
+service_ipv4_cidr = "192.168.0.0/16"
+node_group_min_size = 1
+node_group_max_size = 2
+node_group_desired_size = 2
