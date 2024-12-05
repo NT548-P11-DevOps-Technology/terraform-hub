@@ -67,7 +67,7 @@ module "load_balancer" {
   aws_key_name = var.aws_keyname
   ami = local.ec2_ami
   instance_type = var.autoscaling_group_instance_type
-  user_data = base64encode(file("./scripts/nginx_setup.sh"))
+  user_data = base64encode(file("./scripts/haproxy_setup.sh"))
   ec2_subnets = slice(module.vpc.private_subnets_id, length(module.vpc.private_subnets_id) - 2, length(module.vpc.private_subnets_id))
   ec2_security_groups = [module.haproxy_sg.id]
   min_size = var.autoscaling_group_min_size

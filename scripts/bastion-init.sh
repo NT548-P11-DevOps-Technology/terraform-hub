@@ -4,9 +4,7 @@ sudo apt update
 sudo apt-get update
 sudo apt install net-tools -y
 sudo apt install traceroute -y
-sudo apt install haproxy -y
 sudo apt install certbot -y
-sudo apt install haproxy -y
 sudo apt install iptables-persistent -y
 sudo sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/g' /etc/sysctl.conf
 sudo sysctl -p
