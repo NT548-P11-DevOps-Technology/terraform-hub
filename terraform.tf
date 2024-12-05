@@ -1,8 +1,8 @@
 terraform {
   cloud { 
-    organization = var.aws_profile
+    organization = "DevOpsUIT"
     workspaces { 
-      name = var.aws_owner
+      name = "DoAn"
     } 
   }
   
