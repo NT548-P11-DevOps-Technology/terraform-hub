@@ -100,7 +100,7 @@ module "haproxy_sg" {
         from_port   = 80
         to_port     = 80
         protocol    = "tcp"
-        security_group_id = module.load_balancer.id
+        security_group_id = module.load_balancer_sg.id
     },
     {
         description = "Allow https traffic from load balancer"
