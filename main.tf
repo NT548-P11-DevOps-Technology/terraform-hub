@@ -10,7 +10,7 @@ module "vpc" {
   public_subnets       = var.aws_vpc_config.public_subnets_cidr
   private_subnets      = var.aws_vpc_config.private_subnets_cidr
   azs                  = local.selected_azs
-  gateway_instance     = module.instances.network_interfaces["gateway"]
+  gateway_instance     = module.instances.network_interfaces["${var.aws_project}-gateway"]
 }
 
 module "instances" {
@@ -24,7 +24,7 @@ module "instances" {
   ebs_size = 8
   instances = [
     {
-      name = "gateway"
+      name = "${var.aws_project}-gateway"
       private_ips = local.gateway_private_ips
       subnet_id = module.vpc.public_subnets_id[0]
       source_dest_check = false
@@ -34,29 +34,29 @@ module "instances" {
       security_groups = [module.gateway_sg.id]
     },
     {
-      name = "harbor"
-      private_ips = local.harbor_private_ips
-      instance_type = var.harbor_instance_type
-      ebs_size = var.harbor_ebs_size
+      name = "${var.aws_project}-storage-servers"
+      private_ips = local.storage_servers_ips
+      instance_type = var.storage_servers_instance_type
+      ebs_size = var.storage_servers_ebs_size
     },
+    # {
+    #   name = "${var.aws_project}-minio"
+    #   private_ips = local.minio_private_ips
+    #   instance_type = var.minio_instance_type
+    #   ebs_size = var.minio_ebs_size
+    # },
     {
-      name = "minio"
-      private_ips = local.minio_private_ips
-      instance_type = var.minio_instance_type
-      ebs_size = var.minio_ebs_size
-    },
-    {
-      name = "vault"
-      private_ips = local.vault_private_ips
-      instance_type = var.vault_instance_type
-      ebs_size = var.vault_ebs_size
-    },
-    {
-      name = "security-servers"
+      name = "${var.aws_project}-security-servers"
       private_ips = local.security_servers_private_ips
       instance_type = var.security_servers_instance_type
       ebs_size = var.security_servers_ebs_size
-    }
+    },
+    # {
+    #   name = "${var.aws_project}-security-servers"
+    #   private_ips = local.security_servers_private_ips
+    #   instance_type = var.security_servers_instance_type
+    #   ebs_size = var.security_servers_ebs_size
+    # }
   ]
 }
 

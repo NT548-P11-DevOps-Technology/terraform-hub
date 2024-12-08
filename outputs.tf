@@ -1,5 +1,5 @@
 output "gateway_ip" {
-  value = module.instances.instances["gateway"].public_ip
+  value = module.instances.instances["${var.aws_project}-gateway"].public_ip
 }
 
 output "load_balancer" {

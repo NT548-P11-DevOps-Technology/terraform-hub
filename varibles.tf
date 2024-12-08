@@ -60,38 +60,14 @@ variable "bastion_host_ebs_size" {
   default     = 8
 }
 
-variable "harbor_instance_type" {
-  description = "Harbor instance type"
+variable "storage_servers_instance_type" {
+  description = "Storage servers instance type"
   type        = string
   default     = "t2.micro"
 }
 
-variable "harbor_ebs_size" {
-  description = "Harbor EBS size"
-  type        = number
-  default     = 8
-}
-
-variable "minio_instance_type" {
-  description = "Minio instance type"
-  type        = string
-  default     = "t2.micro"
-}
-
-variable "minio_ebs_size" {
-  description = "Minio EBS size"
-  type        = number
-  default     = 8
-}
-
-variable "vault_instance_type" {
-  description = "Vault instance type"
-  type        = string
-  default     = "t2.micro"
-}
-
-variable "vault_ebs_size" {
-  description = "Vault EBS size"
+variable "storage_servers_ebs_size" {
+  description = "Storage servers EBS size"
   type        = number
   default     = 8
 }
