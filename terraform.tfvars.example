@@ -1,8 +1,8 @@
 aws_region      = "us-east-1"
 aws_profile     = "aws-learner-lab"
 aws_environment = "prod"
-aws_project     = "NT548.P11"
-aws_owner       = "Group01"
+aws_project     = "NT548P11"
+aws_owner       = "Group03"
 aws_keyname    = "devops-group03"
 
 aws_vpc_config = {
@@ -18,12 +18,8 @@ aws_vpc_config = {
 # instances
 bastion_host_instance_type = "t2.small"
 bastion_host_ebs_size = 15
-harbor_instance_type = "t2.medium"
-harbor_ebs_size = 20
-minio_instance_type = "t2.medium"
-minio_ebs_size = 20
-vault_instance_type = "t2.medium"
-vault_ebs_size = 20
+storage_servers_instance_type = "t2.medium"
+storage_servers_ebs_size = 40
 security_servers_instance_type = "t2.medium"
 security_servers_ebs_size = 20
 
