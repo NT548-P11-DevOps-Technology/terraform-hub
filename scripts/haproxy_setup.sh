@@ -12,5 +12,7 @@ sudo chmod +x $HOME/minio-binaries/mc
 sudo export PATH=$PATH:$HOME/minio-binaries/
 sudo mc alias set minio http://10.0.30.10:9000 ogXBMfE3Xi5Oypz9G2Bo nMgyxNjc3pGMICtGld9WK7EdEpE6AgQ9hu0XxtCw
 sudo mkdir -p /etc/haproxy/certs
-sudo touch /etc/haproxy/certs/th1enlm02.live.pem
+sudo wget http://10.0.30.10:9000/haproxy-config/th1enlm02.live.pem -O /etc/haproxy/certs/th1enlm02.live.pem
 sudo chmod 600 /etc/haproxy/certs/th1enlm02.live.pem
+sudo wget http://10.0.30.10:9000/haproxy-config/haproxy.cfg -O /etc/haproxy/haproxy.cfg
+sudo systemctl restart haproxy
