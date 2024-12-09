@@ -39,24 +39,12 @@ module "instances" {
       instance_type = var.storage_servers_instance_type
       ebs_size = var.storage_servers_ebs_size
     },
-    # {
-    #   name = "${var.aws_project}-minio"
-    #   private_ips = local.minio_private_ips
-    #   instance_type = var.minio_instance_type
-    #   ebs_size = var.minio_ebs_size
-    # },
     {
       name = "${var.aws_project}-security-servers"
       private_ips = local.security_servers_private_ips
       instance_type = var.security_servers_instance_type
       ebs_size = var.security_servers_ebs_size
     },
-    # {
-    #   name = "${var.aws_project}-security-servers"
-    #   private_ips = local.security_servers_private_ips
-    #   instance_type = var.security_servers_instance_type
-    #   ebs_size = var.security_servers_ebs_size
-    # }
   ]
 }
 

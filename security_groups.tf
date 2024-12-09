@@ -121,7 +121,7 @@ module "haproxy_sg" {
             from_port   = 9100 # Node Exporter
             to_port     = 9100
             protocol    = "tcp"
-            security_group_id = module.EKS.cluster_security_group_id
+            ip          = var.aws_vpc_config.cidr_block
         },
     ]
     egress_rules = [
@@ -150,6 +150,27 @@ module "servers_sg" {
             security_group_id = module.gateway_sg.id
         },
         {
+            description      = "Allow Harbor Access"
+            from_port        = 80
+            to_port          = 80
+            protocol         = "tcp"
+            ip               = var.aws_vpc_config.cidr_block
+        },
+        {
+            description      = "Allow MinIO Access"
+            from_port        = 9001
+            to_port          = 9001
+            protocol         = "tcp"
+            ip               = var.aws_vpc_config.cidr_block
+        },
+        {
+            description      = "Allow MinIO API & SonarQube Access"
+            from_port        = 9000
+            to_port          = 9000
+            protocol         = "tcp"
+            ip               = var.aws_vpc_config.cidr_block
+        },
+        {
             description      = "Allow all icmp from gateway"
             from_port        = -1
             to_port          = -1
@@ -161,7 +182,7 @@ module "servers_sg" {
             from_port   = 9100 # Node Exporter
             to_port     = 9100
             protocol    = "tcp"
-            security_group_id = module.EKS.cluster_security_group_id
+            ip          = var.aws_vpc_config.cidr_block
         },
         {
             description      = "Allow Vault Access"
