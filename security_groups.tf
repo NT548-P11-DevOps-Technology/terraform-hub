@@ -21,7 +21,7 @@ module "gateway_sg" {
             ip          = "0.0.0.0/0"
         },
         {
-            description = "Allow All Traffic from VPC"
+            description = "Allow Ping"
             from_port   = -1
             to_port     = -1
             protocol    = "icmp"
@@ -103,17 +103,10 @@ module "haproxy_sg" {
             security_group_id = module.load_balancer_sg.id
         },
         {
-            description      = "Allow ssh from gateway"
-            from_port        = 22
-            to_port          = 22
-            protocol         = "tcp"
-            security_group_id = module.gateway_sg.id
-        },
-        {
-            description      = "Allow all icmp from gateway"
+            description      = "Allow all from gateway"
             from_port        = -1
             to_port          = -1
-            protocol         = "icmp"
+            protocol         = "-1"
             security_group_id = module.gateway_sg.id
         },
         {
@@ -143,10 +136,10 @@ module "servers_sg" {
 
     ingress_rules = [
         {
-            description      = "Allow ssh from gateway"
-            from_port        = 22
-            to_port          = 22
-            protocol         = "tcp"
+            description      = "Allow all from gateway"
+            from_port        = -1
+            to_port          = -1
+            protocol         = "-1"
             security_group_id = module.gateway_sg.id
         },
         {
@@ -169,13 +162,6 @@ module "servers_sg" {
             to_port          = 9000
             protocol         = "tcp"
             ip               = var.aws_vpc_config.cidr_block
-        },
-        {
-            description      = "Allow all icmp from gateway"
-            from_port        = -1
-            to_port          = -1
-            protocol         = "icmp"
-            security_group_id = module.gateway_sg.id
         },
         {
             description = "Allow Node Exporter Access"
