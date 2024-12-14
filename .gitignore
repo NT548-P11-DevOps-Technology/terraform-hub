@@ -15,3 +15,4 @@
 inventory.yml
 *.ovpn
 loki.json
+haproxy.cfg
