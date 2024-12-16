@@ -2,7 +2,7 @@ terraform {
   cloud { 
     organization = "DevOpsUIT"
     workspaces { 
-      name = "DoAn"
+      name = "NT548P11-Group03"
     } 
   }
   
